@@ -5,6 +5,11 @@ from datetime import datetime
 import pytz
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
+from threading import Thread
+from flask import Flask
+
+# Flask app
+app = Flask(__name__)
 
 # Webhook Discord
 WEBHOOK_URL = "https://discord.com/api/webhooks/1439986012964126731/b05t-zKqJMCnmU3VWACytid2dsw2DG3bk-TQxVfG6MJI_6qglipuHIuWGURl5nutHwKu"
@@ -15,7 +20,6 @@ tz = pytz.timezone("Europe/Warsaw")
 # Treść wiadomości
 MESSAGE_TEXT = "⚠️ Serwer zostanie zrestartowany za 10 minut! ⚠️"
 
-# Funkcja tworząca obrazek z wiadomością
 def create_image(message):
     width, height = 800, 200
     img = Image.new("RGB", (width, height), color=(30, 30, 30))
@@ -32,7 +36,6 @@ def create_image(message):
     draw.text((x, y), message, font=font, fill=(255, 50, 50))
     return img
 
-# Funkcja wysyłająca webhook z obrazkiem
 def send_webhook():
     now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{now}] Wysyłam powiadomienie...")
@@ -53,14 +56,23 @@ def send_webhook():
         except Exception as e:
             print(f"Błąd połączenia: {e}")
 
-# Harmonogram w czasie polskim
-schedule_times = ["03:50", "09:50", "15:50", "21:50"]
-for t in schedule_times:
-    schedule.every().day.at(t).do(send_webhook)
+def run_scheduler():
+    schedule_times = ["03:50", "09:50", "15:50", "21:50"]
+    for t in schedule_times:
+        schedule.every().day.at(t).do(send_webhook)
+    while True:
+        schedule.run_pending()
+        time.sleep(30)
 
-print("Skrypt graficznych przypomnień uruchomiony...")
+# Start scheduler w osobnym wątku
+Thread(target=run_scheduler, daemon=True).start()
 
-# Pętla główna
-while True:
-    schedule.run_pending()
-    time.sleep(30)
+@app.route("/")
+def home():
+    return "Discord Restart Reminder działa! Harmonogram uruchomiony."
+
+if __name__ == "__main__":
+    # Render wymaga portu z environment variable
+    import os
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
