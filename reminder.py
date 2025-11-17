@@ -18,14 +18,25 @@ TEST_MESSAGE_TEXT = "✅ Test po starcie: webhook działa!"
 
 def create_image(message):
     width, height = 800, 200
-    img = Image.new("RGB", (width, height), color=(30, 30, 30))
+    img = Image.new("RGB", (width, height))
     draw = ImageDraw.Draw(img)
+
+    # Gradient tła (ciemnoczerwony -> czarny)
+    for y in range(height):
+        r = int(30 + (225 - 30) * (y / height))
+        g = int(0 + (30 - 0) * (y / height))
+        b = int(0 + (30 - 0) * (y / height))
+        draw.line([(0, y), (width, y)], fill=(r, g, b))
+
     try:
         font = ImageFont.truetype("arial.ttf", 36)
     except:
         font = ImageFont.load_default()
 
-    # Pobranie wymiarów tekstu w nowszych wersjach Pillow
+    # Ikona zegara (prostokątne kółko po lewej)
+    draw.ellipse((20, 60, 100, 140), fill=(255, 215, 0))
+
+    # Wymiary tekstu
     try:
         bbox = draw.textbbox((0, 0), message, font=font)
         text_width = bbox[2] - bbox[0]
@@ -33,9 +44,10 @@ def create_image(message):
     except AttributeError:
         text_width, text_height = font.getsize(message)
 
-    x = (width - text_width) / 2
+    x = (width - text_width) / 2 + 30  # przesunięcie na prawo od ikony
     y = (height - text_height) / 2
-    draw.text((x, y), message, font=font, fill=(255, 50, 50))
+    draw.text((x, y), message, font=font, fill=(255, 255, 255))
+
     return img
 
 def send_webhook(message):
@@ -52,7 +64,7 @@ def send_webhook(message):
             )
             print(f"[{now}] Status: {response.status_code} {response.text}")
         except Exception as e:
-            print(f"[{now}] Błąd połączenia: {e}")
+            print(f"Błąd połączenia: {e}")
 
 def run_scheduler():
     schedule_times = ["03:50", "09:50", "15:50", "21:50"]
