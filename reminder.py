@@ -24,7 +24,15 @@ def create_image(message):
         font = ImageFont.truetype("arial.ttf", 36)
     except:
         font = ImageFont.load_default()
-    text_width, text_height = draw.textsize(message, font=font)
+
+    # Pobranie wymiarów tekstu w nowszych wersjach Pillow
+    try:
+        bbox = draw.textbbox((0, 0), message, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+    except AttributeError:
+        text_width, text_height = font.getsize(message)
+
     x = (width - text_width) / 2
     y = (height - text_height) / 2
     draw.text((x, y), message, font=font, fill=(255, 50, 50))
@@ -44,7 +52,7 @@ def send_webhook(message):
             )
             print(f"[{now}] Status: {response.status_code} {response.text}")
         except Exception as e:
-            print(f"Błąd połączenia: {e}")
+            print(f"[{now}] Błąd połączenia: {e}")
 
 def run_scheduler():
     schedule_times = ["03:50", "09:50", "15:50", "21:50"]
