@@ -13,10 +13,13 @@ WEBHOOK_URL = "https://discord.com/api/webhooks/1439986012964126731/b05t-zKqJMCn
 tz = pytz.timezone("Europe/Warsaw")
 
 MESSAGE_TEXT = (
+    "⏰ **Server Restart Reminder!**\n"
+    "⚠️ Server will restart in 10 minutes! ⚠️\n"
+    "📌 Prepare for a temporary downtime.\n"
+    "=============================================\n"
     "⏰ **Przypomnienie o restarcie serwera!**\n"
     "⚠️ Serwer zostanie zrestartowany za 10 minut! ⚠️\n"
     "📌 Przygotujcie się na chwilową przerwę.\n"
-    "💡 Wskazówka: zapisz swoje postępy przed restartem."
 )
 
 TEST_MESSAGE_TEXT = "✅ Test po starcie: webhook działa!"
