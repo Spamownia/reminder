@@ -1,7 +1,7 @@
 import requests
 import schedule
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
@@ -11,15 +11,11 @@ import os
 
 app = Flask(__name__)
 
-# Webhook Discord
 WEBHOOK_URL = "https://discord.com/api/webhooks/1439986012964126731/b05t-zKqJMCnmU3VWACytid2dsw2DG3bk-TQxVfG6MJI_6qglipuHIuWGURl5nutHwKu"
-
-# Strefa Polska
 tz = pytz.timezone("Europe/Warsaw")
 MESSAGE_TEXT = "⚠️ Serwer zostanie zrestartowany za 10 minut! ⚠️"
 TEST_MESSAGE_TEXT = "✅ Test po starcie: webhook działa!"
 
-# Funkcja tworząca obrazek
 def create_image(message):
     width, height = 800, 200
     img = Image.new("RGB", (width, height), color=(30, 30, 30))
@@ -34,11 +30,9 @@ def create_image(message):
     draw.text((x, y), message, font=font, fill=(255, 50, 50))
     return img
 
-# Funkcja wysyłająca webhook z obrazkiem
 def send_webhook(message):
     now = datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{now}] Wysyłam wiadomość: {message}")
-
     img = create_image(message)
     with BytesIO() as image_binary:
         img.save(image_binary, "PNG")
@@ -50,14 +44,12 @@ def send_webhook(message):
             )
             print(f"[{now}] Status: {response.status_code} {response.text}")
         except Exception as e:
-            print(f"[{now}] Błąd połączenia: {e}")
+            print(f"Błąd połączenia: {e}")
 
-# Harmonogram w UTC przeliczony z CET
 def run_scheduler():
     schedule_times = ["03:50", "09:50", "15:50", "21:50"]
     for t in schedule_times:
         hour, minute = map(int, t.split(":"))
-        # przelicz CET na UTC
         now = datetime.now(tz)
         target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         utc_hour = target.astimezone(pytz.utc).hour
@@ -72,15 +64,12 @@ def run_scheduler():
 # Start scheduler w osobnym wątku
 Thread(target=run_scheduler, daemon=True).start()
 
-# Endpoint testowy
+# Wyślij natychmiastową wiadomość testową w osobnym wątku
+Thread(target=lambda: send_webhook(TEST_MESSAGE_TEXT)).start()
+
 @app.route("/")
 def home():
     return "Discord Restart Reminder działa! Harmonogram uruchomiony."
-
-# Wiadomość testowa po starcie
-@app.before_first_request
-def startup_message():
-    Thread(target=lambda: send_webhook(TEST_MESSAGE_TEXT)).start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
