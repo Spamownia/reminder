@@ -5,6 +5,7 @@ import os
 from flask import Flask
 from datetime import datetime, timedelta
 import pytz
+import threading
 
 # ---------------- CONFIG ----------------
 WEBHOOK_URL = "https://discord.com/api/webhooks/1440029602603864094/aTvg3TEcY3_SYCBxNzCgTr1ppLoMZGgMqzaMlamN5qCm8aZJK4QKGbuyQfyCX5Y5Le8M"
@@ -20,12 +21,14 @@ MESSAGE_TEXT = (
     "=============================================\n"
     "⏰ **Przypomnienie o restarcie serwera!**\n"
     "⚠️ Serwer zostanie zrestartowany za 10 minut! ⚠️\n"
-    "📌 Przygotujcie się na chwilową przerwę.\n"
+    "📌 Przygotujcie się na chwilową przerwę."
 )
 
 TEST_MESSAGE_TEXT = "✅ Test po starcie: webhook działa!"
 
 app = Flask(__name__)
+
+last_sent_minute = None
 
 
 # ---------------- WEBHOOK ----------------
@@ -47,27 +50,34 @@ def get_next_run_time():
 
     for t in SCHEDULE_TIMES:
         hour, minute = map(int, t.split(":"))
-
-        run_time = now.replace(
-            hour=hour,
-            minute=minute,
-            second=0,
-            microsecond=0
-        )
+        run_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
         if run_time <= now:
             run_time += timedelta(days=1)
 
         candidates.append(run_time)
 
-    next_run = min(candidates)
-    return next_run
+    return min(candidates)
+
+
+# ---------------- SELF PING ----------------
+def self_ping():
+    while True:
+        try:
+            url = f"http://127.0.0.1:{os.environ.get('PORT', 10000)}/"
+            requests.get(url, timeout=10)
+            print(f"[{datetime.now(TZ).strftime('%H:%M:%S')}] Self-ping OK")
+        except Exception as e:
+            print(f"Self-ping error: {e}")
+
+        time.sleep(300)  # co 5 minut
 
 
 # ---------------- MAIN LOOP ----------------
 def scheduler_loop():
-    print("Scheduler uruchomiony")
+    global last_sent_minute
 
+    print("Scheduler uruchomiony")
     send_webhook(TEST_MESSAGE_TEXT)
 
     last_heartbeat = datetime.now(TZ)
@@ -77,36 +87,34 @@ def scheduler_loop():
         next_run = get_next_run_time()
         seconds_left = (next_run - now).total_seconds()
 
-        # Heartbeat co 60 sekund (Render lubi aktywność)
+        # Heartbeat co 60 sekund
         if (now - last_heartbeat).total_seconds() >= 60:
             print(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Heartbeat | Next run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
             last_heartbeat = now
 
-        # Jeśli czas wysyłki nadszedł
-        if seconds_left <= 1:
+        # Ochrona przed podwójną wysyłką
+        current_minute = now.strftime("%Y-%m-%d %H:%M")
+
+        if seconds_left <= 1 and last_sent_minute != current_minute:
             send_webhook(MESSAGE_TEXT)
-            time.sleep(2)  # zabezpieczenie przed podwójną wysyłką
+            last_sent_minute = current_minute
+            time.sleep(2)
             continue
 
-        # Uśpij maksymalnie na 10 sekund, żeby Render nie ubijał
-        sleep_time = min(10, seconds_left)
-        if sleep_time > 0:
-            time.sleep(sleep_time)
+        time.sleep(min(10, max(1, seconds_left)))
 
 
 # ---------------- FLASK ----------------
 @app.route("/")
 def home():
-    return "Discord Restart Reminder działa."
+    return "Discord Restart Reminder działa poprawnie."
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-
     print(f"Uruchamiam Flask na porcie {port}")
 
-    import threading
-    scheduler_thread = threading.Thread(target=scheduler_loop)
-    scheduler_thread.start()
+    threading.Thread(target=scheduler_loop, daemon=True).start()
+    threading.Thread(target=self_ping, daemon=True).start()
 
     app.run(host="0.0.0.0", port=port)
