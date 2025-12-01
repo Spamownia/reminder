@@ -3,7 +3,7 @@ import requests
 import time
 import os
 from flask import Flask
-from datetime import datetime, timedelta
+from datetime import datetime
 import pytz
 import threading
 
@@ -28,7 +28,7 @@ TEST_MESSAGE_TEXT = "✅ Test po starcie: webhook działa!"
 
 app = Flask(__name__)
 
-last_sent_minute = None
+last_sent = None
 
 
 # ---------------- WEBHOOK ----------------
@@ -41,23 +41,6 @@ def send_webhook(message):
         print(f"[{now}] Status: {response.status_code}")
     except Exception as e:
         print(f"[{now}] Błąd: {e}")
-
-
-# ---------------- TIME CALC ----------------
-def get_next_run_time():
-    now = datetime.now(TZ)
-    candidates = []
-
-    for t in SCHEDULE_TIMES:
-        hour, minute = map(int, t.split(":"))
-        run_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-
-        if run_time <= now:
-            run_time += timedelta(days=1)
-
-        candidates.append(run_time)
-
-    return min(candidates)
 
 
 # ---------------- SELF PING ----------------
@@ -75,7 +58,7 @@ def self_ping():
 
 # ---------------- MAIN LOOP ----------------
 def scheduler_loop():
-    global last_sent_minute
+    global last_sent
 
     print("Scheduler uruchomiony")
     send_webhook(TEST_MESSAGE_TEXT)
@@ -84,24 +67,20 @@ def scheduler_loop():
 
     while True:
         now = datetime.now(TZ)
-        next_run = get_next_run_time()
-        seconds_left = (next_run - now).total_seconds()
+        current_time = now.strftime("%H:%M")
+        current_stamp = now.strftime("%Y-%m-%d %H:%M")
 
         # Heartbeat co 60 sekund
         if (now - last_heartbeat).total_seconds() >= 60:
-            print(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Heartbeat | Next run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+            print(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Heartbeat")
             last_heartbeat = now
 
-        # Ochrona przed podwójną wysyłką
-        current_minute = now.strftime("%Y-%m-%d %H:%M")
-
-        if seconds_left <= 1 and last_sent_minute != current_minute:
+        # Główna logika wyzwalania
+        if current_time in SCHEDULE_TIMES and last_sent != current_stamp:
             send_webhook(MESSAGE_TEXT)
-            last_sent_minute = current_minute
-            time.sleep(2)
-            continue
+            last_sent = current_stamp
 
-        time.sleep(min(10, max(1, seconds_left)))
+        time.sleep(1)
 
 
 # ---------------- FLASK ----------------
